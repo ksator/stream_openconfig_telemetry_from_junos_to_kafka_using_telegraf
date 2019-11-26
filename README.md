@@ -193,6 +193,36 @@ $ docker ps | grep telegraf
 6b885a329f40        telegraf                 "/entrypoint.sh tele…"   42 seconds ago      Up 41 seconds       8092/udp, 8125/udp, 8094/tcp                         telegraf
 ```
 
+For troubleshooting purposes you can run this command
+```
+$ docker logs telegraf
+```
+start a shell session in the telegraf container
+```
+$ docker exec -it telegraf bash
+```
+verify the telegraf configuration file
+```
+# more /etc/telegraf/telegraf.conf
+```
+exit the telegraf container
+```
+# exit
+```
+
+
+
+To Display information about sensors, run this command on a Junos device:
+
+```
+jcluser@vMX1> show agent sensors
+```
+
+To verify if there is an established connection between Telegraf (grpc client) and a Junos device (grpc server), run this command on a Junos device:
+```
+jcluser@vMX1> show system connections | grep 32768
+```
+
 # Kafkacat 
 
 Kafkacat is a command line tool to produce and consume messages  
