@@ -1,8 +1,12 @@
+# About this repo  
+
+# Requirements 
+
+Install Docker and install Docker-compose  
+
 # Deploy a Kafka broker
 
 The file [docker-compose.yml](docker-compose.yml) uses the Docker images [wurstmeister/zookeeper](https://hub.docker.com/r/wurstmeister/zookeeper) and [wurstmeister/kafka](https://hub.docker.com/r/wurstmeister/kafka) 
-
-Install Docker and Docker-compose  
 
 Edit the file [docker-compose.yml](docker-compose.yml) and update `KAFKA_ADVERTISED_HOST_NAME` with your host IP
 
@@ -28,10 +32,24 @@ $ nc -vz 100.123.35.0 9092
 Connection to 100.123.35.0 9092 port [tcp/*] succeeded!
 ```
 
-# 
+# Junos requirements
 
-docker run --rm --name telegraf -d -v $PWD/telegraf.conf:/etc/telegraf/telegraf.conf:ro telegraf
+# Telegraf 
 
+Update the file [telegraf.conf](telegraf.conf) with your host IP.  
+
+Run this command to start Telegraf  
+```
+$ docker run --rm --name telegraf -d -v $PWD/telegraf.conf:/etc/telegraf/telegraf.conf:ro telegraf
+```
+```
+$ docker images | grep telegraf
+telegraf                 latest              c7fc0c75c4ff        2 days ago          254MB
+```
+```
+$ docker ps | grep telegraf
+6b885a329f40        telegraf                 "/entrypoint.sh tele…"   42 seconds ago      Up 41 seconds       8092/udp, 8125/udp, 8094/tcp                         telegraf
+```
 
 # Kafkacat 
 
@@ -44,7 +62,7 @@ On Ubuntu, run this command to install kafkacat
 $ apt-get install kafkacat
 ```
 
-Alternatively, install Docker and use the Docker image [edenhill/kafkacat](https://hub.docker.com/r/edenhill/kafkacat/)  
+Alternatively, use the Docker image [edenhill/kafkacat](https://hub.docker.com/r/edenhill/kafkacat/)  
 
 ## List metadata from topics from a broker
 
@@ -63,7 +81,7 @@ Using Docker
 ```
 $ docker run --rm -it edenhill/kafkacat:1.5.0 -L -b 100.123.35.0:9092
 ```
-## Consume messages 
+## Consume messages
 
 In producer mode, Kafkacat reads messages from stdin, and sends them to the broker.  
 In consumer mode, Kafkacat gets messages from the broker and writes messages to stdout.  
@@ -92,5 +110,49 @@ To consume the last 2 messages and automatically exit, run this  kafkacat comman
 $ kafkacat -C -b 100.123.35.0:9092 -t juniper -o -2 -e
 ```
 
-#
+# Consume Kafka messages using Python
 
+# Stop the setup 
+
+## Telegraf 
+```
+$ docker stop telegraf
+telegraf
+```
+```
+$ docker ps | grep telegraf
+$ docker ps -a | grep telegraf
+```
+## Kafka
+
+### Stop Kafka without removing containers
+
+```
+$ docker-compose stop
+Stopping kafka     ... done
+Stopping zookeeper ... done
+```
+```
+$ docker ps | grep wurstmeister
+$ docker ps -a | grep wurstmeister
+CONTAINER ID        IMAGE                     COMMAND                  CREATED             STATUS                        PORTS               NAMES
+45b13d484728        wurstmeister/kafka        "start-kafka.sh"         9 hours ago         Exited (143) 36 seconds ago                       kafka
+0957d9af0d62        wurstmeister/zookeeper    "/bin/sh -c '/usr/sb…"   9 hours ago         Exited (137) 29 seconds ago                       zookeeper
+```
+
+### Stop Kafka and remove containers
+```
+$ docker-compose down
+Stopping kafka     ... done
+Stopping zookeeper ... done
+Removing kafka     ... done
+Removing zookeeper ... done
+```
+```
+$ docker ps  | grep wurstmeister
+$ docker ps -a | grep wurstmeister
+```
+
+# Credits 
+
+Thank you to Jag Channa for writing this blog: https://openeye.blog/2018/03/05/streaming-junos-telemetry-to-apache-kafka-via-telegraf/  It provided the basis for this repository.
