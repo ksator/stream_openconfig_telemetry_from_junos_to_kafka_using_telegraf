@@ -10,14 +10,14 @@
   - to collect openconfig data from Junos devices (`jti_openconfig_telemetry` input plugin, Telegraf is a grpc client)   
   - to produce Kafta messages (with the data collected from Junos devices) to the Kafka broker (`kafka` output plugin).
 - Consumers: 
-  - a Kafka command line tool (kafkacat) to consume messages from the broker 
-  - python scripts to consume messages from the broker  
+  - a command line tool (kafkacat) to consume Kafka messages
+  - python scripts to consume Kafka messages 
 
 # Requirements 
 
 ## Host requirements 
 
-Install Docker and install Docker-compose  
+Install Docker and Docker-compose  
 
 ## Junos requirements  
 
@@ -203,10 +203,15 @@ $ docker ps | grep telegraf
 ```
 ## Telegraf troubleshooting 
 
+### Telegraf logs
+
 For troubleshooting purposes you can run this command
 ```
 $ docker logs telegraf
 ```
+
+### Telegraf configuration  
+
 start a shell session in the telegraf container
 ```
 $ docker exec -it telegraf bash
