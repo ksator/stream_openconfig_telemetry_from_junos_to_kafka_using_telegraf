@@ -1,7 +1,7 @@
 # About this repo  
 
 - How to stream openconfig telemetry from junos devices to kafka using telegraf   
-- How to consume the kafka messages  
+- How to consume the kafka messages using Kafkacat or Python
 
 We will use: 
 - Junos devices with Openconfig telemetry support (Junos devices are the grpc servers)  
@@ -9,7 +9,7 @@ We will use:
 - a Kafka broker 
 - Telegraf to produce Kafta messages (with the data collected from Junos devices) to the Kafka broker.
 - a Kafka command line tool (kafkacat) to consume messages from the broker 
-- python scripts to to consume messages from the broker  
+- python scripts to consume messages from the broker  
 
 # Requirements 
 
@@ -27,15 +27,15 @@ Starting with Junos OS Release 18.3R1:
 - the Junos OS image includes the ```OpenConfig``` package; therefore, you do not need anymore to install ```OpenConfig``` separately on your device.  
 - the Junos OS image includes the ```Network Agent```, therefore, you do not need anymore to install the ```network agent``` separately on your device.  
 
-This setup is using an older Junos release, so I installed these two packages. 
-
-Here's the details:
+This setup is using an older Junos release, so I installed these two packages:  
 ```
 jcluser@vMX1> show version | match "Junos:|openconfig|na telemetry"
 Junos: 18.2R1.9
 JUNOS na telemetry [18.2R1-S3.2-C1]
 JUNOS Openconfig [0.0.0.10-1]
 ```
+### YANG files on Junos devices  
+
 To show YANG packages installed on Junos, run this command 
 ```
 jcluser@vMX-1> show system yang package
@@ -44,7 +44,7 @@ YANG Module(s)        :iana-if-type.yang ietf-inet-types.yang ietf-interfaces.ya
 Translation Script(s) :openconfig-bgp.slax openconfig-interface.slax openconfig-lldp.slax openconfig-local-routing.slax openconfig-mpls.slax openconfig-network-instance.slax openconfig-ni-bgp.slax openconfig-ni-mpls.slax openconfig-policy.slax openconfig-vlan.slax
 Translation script status is enabled
 ```
-To list YANG modules available on Junos, Run this command: 
+To list YANG modules available on Junos, run this command: 
 ```
 jcluser@vMX-1> file list /opt/yang-pkg/junos-openconfig/yang/
 
@@ -175,10 +175,15 @@ Connection to 100.123.35.0 9092 port [tcp/*] succeeded!
 
 Telegraf is an open source collector written in GO.  
 It is plugin-driven (it has input plugins, output plugins, ...)  
-We will use jti_openconfig_telemetry input plugin (grpc client to collect telemetry on junos devices) and kafka output plugin.   
+
+## Telegraf configuration  
+
+We will use `jti_openconfig_telemetry` input plugin (grpc client to collect telemetry on junos devices) and `kafka` output plugin.   
 So, Telegraf will collect openconfig data from Junos devices and produce Kafta messages (with the data collected) .
 
 Update the file [telegraf.conf](telegraf.conf) with your host IP.  
+
+## Start Telegraf 
 
 Run this command to start Telegraf  
 ```
@@ -192,6 +197,7 @@ telegraf                 latest              c7fc0c75c4ff        2 days ago     
 $ docker ps | grep telegraf
 6b885a329f40        telegraf                 "/entrypoint.sh tele…"   42 seconds ago      Up 41 seconds       8092/udp, 8125/udp, 8094/tcp                         telegraf
 ```
+## Telegraf troubleshooting 
 
 For troubleshooting purposes you can run this command
 ```
@@ -255,15 +261,13 @@ $ docker run --rm -it edenhill/kafkacat:1.5.0 -L -b 100.123.35.0:9092
 ```
 ## Consume messages
 
-In producer mode, Kafkacat reads messages from stdin, and sends them to the broker.  
 In consumer mode, Kafkacat gets messages from the broker and writes messages to stdout.  
 
-To use Kafkacat in consumer mode with the broker `100.123.35.0:9092` and the topic `juniper`: 
-run this  kafkacat command: 
+To use Kafkacat in consumer mode with the broker `100.123.35.0:9092` and the topic `juniper`, run this  kafkacat command: 
 ```
 $ kafkacat -C -b 100.123.35.0:9092 -t juniper
 ```
-or run this Docker command: 
+or run the equivalent Docker command: 
 ```
 $ docker run --rm -it edenhill/kafkacat:1.5.0 -C -b 100.123.35.0:9092 -t juniper
 ```
@@ -282,7 +286,41 @@ To consume the last 2 messages and automatically exit, run this  kafkacat comman
 $ kafkacat -C -b 100.123.35.0:9092 -t juniper -o -2 -e
 ```
 
-# Consume Kafka messages using Python
+# Python
+
+We will consume Kafka messages using 
+
+## Requirements 
+
+On Ubuntu, run this command
+
+```
+$ pip install kafka-python  
+```
+
+## Use Python to consume messages
+
+Update the variable `kafka` in the python scripts [consumer1.py](consumer1.py) and [consumer2.py](consumer2.py) with your broker IP. 
+
+Thes python scripts [consumer1.py](consumer1.py) and [consumer2.py](consumer2.py) consume and print the messages from your broker (topic juniper).  
+
+[consumer2.py](consumer2.py) parses the messages. 
+
+```
+$ python consumer1.py
+....
+topic=juniper offset=716900 value={"fields":{"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/apply-policy/state/export-policy":"bgp-out","/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/apply-policy/state/import-policy":"bgp-in","/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/as-path-options/state/allow-own-as":1,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/as-path-options/state/replace-peer-as":false,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/ebgp-multihop/state/enabled":false,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/ebgp-multihop/state/multihop-ttl":0,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/error-handling/state/erroneous-update-messages":0,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/error-handling/state/treat-as-withdraw":false,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/graceful-restart/state/enabled":false,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/graceful-restart/state/helper-only":true,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/graceful-restart/state/local-restarting":false,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/graceful-restart/state/mode":"HELPER_ONLY","/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/graceful-restart/state/peer-restart-time":120,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/graceful-restart/state/peer-restarting":false,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/graceful-restart/state/restart-time":120,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/logging-options/state/log-neighbor-state-changes":false,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/route-reflector/state/route-reflector-client":false,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/route-reflector/state/route-reflector-cluster-id":"zero-len","/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/snmp-peer-index":1,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/auth-password":"(null)","/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/description":"(null)","/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/enabled":true,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/established-transitions":1,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/import-eval":false,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/import-eval-pending":false,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/interface-error":false,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/last-established":271870,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/local-as":104,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/messages/received/NOTIFICATION":0,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/messages/received/UPDATE":5,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/messages/sent/NOTIFICATION":0,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/messages/sent/UPDATE":5,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/neighbor-address":"192.168.2.0","/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/peer-as":102,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/peer-group":"underlay","/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/peer-type":"EXTERNAL","/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/queues/input":0,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/queues/output":0,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/remove-private-as":"0","/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/route-flap-damping":false,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/session-admin-status":"START","/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/session-state":"ESTABLISHED","/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/session-status":"RUNNING","/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/supported-capabilities":"MPBGP","/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/transport/state/local-address":"192.168.2.1","/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/transport/state/local-port":54928,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/transport/state/mtu-discovery":false,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/transport/state/passive-mode":false,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/transport/state/remote-address":"192.168.2.0","/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/transport/state/remote-port":179,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/transport/state/tcp-mss":0,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/use-multiple-paths/ebgp/state/allow-multiple-as":true,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/use-multiple-paths/ebgp/state/maximum-paths":16,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/use-multiple-paths/ibgp/state/maximum-paths":16,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/use-multiple-paths/state/enabled":true,"_component_id":65535,"_sequence":2955,"_subcomponent_id":0,"_timestamp":1574756676802},"name":"/network-instances/network-instance/protocols/protocol/bgp/","tags":{"/network-instances/network-instance/@instance-name":"master","/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/@neighbor-address":"192.168.2.0","device":"100.123.1.3","host":"6b885a329f40","path":"sensor_1001:/network-instances/network-instance/protocols/protocol/bgp/:/network-instances/network-instance/protocols/protocol/bgp/:rpd","system_id":"vMX-addr-3"},"timestamp":1574756675}
+
+topic=juniper offset=716901 value={"fields":{"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/apply-policy/state/export-policy":"bgp-out","/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/apply-policy/state/import-policy":"bgp-in","/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/as-path-options/state/allow-own-as":1,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/as-path-options/state/replace-peer-as":false,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/ebgp-multihop/state/enabled":false,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/ebgp-multihop/state/multihop-ttl":0,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/error-handling/state/erroneous-update-messages":0,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/error-handling/state/treat-as-withdraw":false,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/graceful-restart/state/enabled":false,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/graceful-restart/state/helper-only":true,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/graceful-restart/state/local-restarting":false,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/graceful-restart/state/mode":"HELPER_ONLY","/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/graceful-restart/state/peer-restart-time":120,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/graceful-restart/state/peer-restarting":false,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/graceful-restart/state/restart-time":120,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/logging-options/state/log-neighbor-state-changes":false,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/route-reflector/state/route-reflector-client":false,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/route-reflector/state/route-reflector-cluster-id":"zero-len","/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/snmp-peer-index":0,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/auth-password":"(null)","/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/description":"(null)","/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/enabled":true,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/established-transitions":1,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/import-eval":false,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/import-eval-pending":false,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/interface-error":false,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/last-established":271866,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/local-as":104,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/messages/received/NOTIFICATION":0,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/messages/received/UPDATE":5,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/messages/sent/NOTIFICATION":0,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/messages/sent/UPDATE":3,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/neighbor-address":"192.168.1.0","/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/peer-as":101,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/peer-group":"underlay","/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/peer-type":"EXTERNAL","/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/queues/input":0,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/queues/output":0,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/remove-private-as":"0","/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/route-flap-damping":false,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/session-admin-status":"START","/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/session-state":"ESTABLISHED","/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/session-status":"RUNNING","/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/supported-capabilities":"MPBGP","/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/transport/state/local-address":"192.168.1.1","/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/transport/state/local-port":57814,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/transport/state/mtu-discovery":false,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/transport/state/passive-mode":false,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/transport/state/remote-address":"192.168.1.0","/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/transport/state/remote-port":179,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/transport/state/tcp-mss":0,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/use-multiple-paths/ebgp/state/allow-multiple-as":true,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/use-multiple-paths/ebgp/state/maximum-paths":16,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/use-multiple-paths/ibgp/state/maximum-paths":16,"/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/use-multiple-paths/state/enabled":true,"_component_id":65535,"_sequence":2955,"_subcomponent_id":0,"_timestamp":1574756676802},"name":"/network-instances/network-instance/protocols/protocol/bgp/","tags":{"/network-instances/network-instance/@instance-name":"master","/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/@neighbor-address":"192.168.1.0","device":"100.123.1.3","host":"6b885a329f40","path":"sensor_1001:/network-instances/network-instance/protocols/protocol/bgp/:/network-instances/network-instance/protocols/protocol/bgp/:rpd","system_id":"vMX-addr-3"},"timestamp":1574756675}
+....
+
+```
+```
+$ python consumer2.py
+```
+
+
+
 
 # Stop the setup 
 
