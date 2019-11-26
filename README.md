@@ -1,10 +1,149 @@
 # About this repo  
 
+- How to stream openconfig telemetry from junos devices to kafka using telegraf   
+- How to consume the kafka messages  
+
+We will use: 
+- Junos devices with Openconfig telemetry support (Junos devices are the grpc servers)  
+- Telegraf to collect openconfig data from Junos devices (Telegraf is the grpc client)  
+- a Kafka broker 
+- Telegraf to produce Kafta messages (with the data collected from Junos devices) to the Kafka broker.
+- a Kafka command line tool (kafkacat) to consume messages from the broker 
+- python scripts to to consume messages from the broker  
+
 # Requirements 
+
+## Host requirements 
 
 Install Docker and install Docker-compose  
 
-# Deploy a Kafka broker
+## Junos requirements  
+
+### Junos packages 
+
+In order to collect data from Junos using openconfig telemetry, the devices require the Junos packages ```openconfig``` and ```network agent```
+
+Starting with Junos OS Release 18.3R1: 
+- the Junos OS image includes the ```OpenConfig``` package; therefore, you do not need anymore to install ```OpenConfig``` separately on your device.  
+- the Junos OS image includes the ```Network Agent```, therefore, you do not need anymore to install the ```network agent``` separately on your device.  
+
+This setup is using an older Junos release, so I installed these two packages. 
+
+Here's the details:
+```
+jcluser@vMX1> show version | match "Junos:|openconfig|na telemetry"
+Junos: 18.2R1.9
+JUNOS na telemetry [18.2R1-S3.2-C1]
+JUNOS Openconfig [0.0.0.10-1]
+```
+To show YANG packages installed on Junos, run this command 
+```
+jcluser@vMX-1> show system yang package
+Package ID            :junos-openconfig
+YANG Module(s)        :iana-if-type.yang ietf-inet-types.yang ietf-interfaces.yang ietf-yang-types.yang jnx-aug-openconfig-bgp.yang jnx-aug-openconfig-if-ip.yang jnx-aug-openconfig-interfaces.yang jnx-aug-openconfig-isis.yang jnx-aug-openconfig-lacp.yang jnx-aug-openconfig-lldp.yang jnx-aug-openconfig-local-routing.yang jnx-aug-openconfig-mpls.yang jnx-aug-openconfig-ni.yang jnx-aug-openconfig-routing-policy.yang jnx-openconfig-dev.yang junos-extension.yang openconfig-bgp-common-multiprotocol.yang openconfig-bgp-common-structure.yang openconfig-bgp-common.yang openconfig-bgp-global.yang openconfig-bgp-neighbor.yang openconfig-bgp-peer-group.yang openconfig-bgp-policy.yang openconfig-bgp-types.yang openconfig-bgp.yang openconfig-extensions.yang openconfig-if-aggregate.yang openconfig-if-ethernet.yang openconfig-if-ip-ext.yang openconfig-if-ip.yang openconfig-inet-types.yang openconfig-interfaces.yang openconfig-isis-lsdb-types.yang openconfig-isis-lsp.yang openconfig-isis-policy.yang openconfig-isis-routing.yang openconfig-isis-types.yang openconfig-isis.yang openconfig-lacp.yang openconfig-lldp-types.yang openconfig-lldp.yang openconfig-local-routing.yang openconfig-mpls-igp.yang openconfig-mpls-ldp.yang openconfig-mpls-rsvp.yang openconfig-mpls-sr.yang openconfig-mpls-static.yang openconfig-mpls-te.yang openconfig-mpls-types.yang openconfig-mpls.yang openconfig-network-instance-l2.yang openconfig-network-instance-l3.yang openconfig-network-instance-types.yang openconfig-network-instance.yang openconfig-platform-transceiver.yang openconfig-platform-types.yang openconfig-platform.yang openconfig-policy-types.yang openconfig-rib-bgp-ext.yang openconfig-rib-bgp-types.yang openconfig-rib-bgp.yang openconfig-routing-policy.yang openconfig-segment-routing.yang openconfig-terminal-device.yang openconfig-transport-types.yang openconfig-types.yang openconfig-vlan-types.yang openconfig-vlan.yang openconfig-yang-types.yang
+Translation Script(s) :openconfig-bgp.slax openconfig-interface.slax openconfig-lldp.slax openconfig-local-routing.slax openconfig-mpls.slax openconfig-network-instance.slax openconfig-ni-bgp.slax openconfig-ni-mpls.slax openconfig-policy.slax openconfig-vlan.slax
+Translation script status is enabled
+```
+To list YANG modules available on Junos, Run this command: 
+```
+jcluser@vMX-1> file list /opt/yang-pkg/junos-openconfig/yang/
+
+/opt/yang-pkg/junos-openconfig/yang/:
+deviation/
+iana-if-type.yang
+ietf-inet-types.yang
+ietf-interfaces.yang
+ietf-yang-types.yang
+jnx-aug-openconfig-bgp.yang
+jnx-aug-openconfig-if-ip.yang
+jnx-aug-openconfig-interfaces.yang
+jnx-aug-openconfig-isis.yang
+jnx-aug-openconfig-lacp.yang
+jnx-aug-openconfig-lldp.yang
+jnx-aug-openconfig-local-routing.yang
+jnx-aug-openconfig-mpls.yang
+jnx-aug-openconfig-ni.yang
+jnx-aug-openconfig-routing-policy.yang
+jnx-openconfig-dev.yang@ -> /opt/yang-pkg/junos-openconfig/yang/deviation/jnx-openconfig-dev.yang
+junos-extension.yang
+openconfig-bgp-common-multiprotocol.yang
+openconfig-bgp-common-structure.yang
+openconfig-bgp-common.yang
+openconfig-bgp-global.yang
+openconfig-bgp-neighbor.yang
+openconfig-bgp-peer-group.yang
+openconfig-bgp-policy.yang
+openconfig-bgp-types.yang
+openconfig-bgp.yang
+openconfig-extensions.yang
+openconfig-if-aggregate.yang
+openconfig-if-ethernet.yang
+openconfig-if-ip-ext.yang
+openconfig-if-ip.yang
+openconfig-inet-types.yang
+openconfig-interfaces.yang
+openconfig-isis-lsdb-types.yang
+openconfig-isis-lsp.yang
+openconfig-isis-policy.yang
+openconfig-isis-routing.yang
+openconfig-isis-types.yang
+openconfig-isis.yang
+openconfig-lacp.yang
+openconfig-lldp-types.yang
+openconfig-lldp.yang
+openconfig-local-routing.yang
+openconfig-mpls-igp.yang
+openconfig-mpls-ldp.yang
+openconfig-mpls-rsvp.yang
+openconfig-mpls-sr.yang
+openconfig-mpls-static.yang
+openconfig-mpls-te.yang
+openconfig-mpls-types.yang
+openconfig-mpls.yang
+openconfig-network-instance-l2.yang
+openconfig-network-instance-l3.yang
+openconfig-network-instance-types.yang
+openconfig-network-instance.yang
+openconfig-platform-transceiver.yang
+openconfig-platform-types.yang
+openconfig-platform.yang
+openconfig-policy-types.yang
+openconfig-rib-bgp-ext.yang
+openconfig-rib-bgp-types.yang
+openconfig-rib-bgp.yang
+openconfig-routing-policy.yang
+openconfig-segment-routing.yang
+openconfig-terminal-device.yang
+openconfig-transport-types.yang
+openconfig-types.yang
+openconfig-vlan-types.yang
+openconfig-vlan.yang
+openconfig-yang-types.yang
+```
+To know which `reference` of a YANG module is used on a Junos device, run the below command.  
+Example with openconfig-interfaces.yang YANG module
+```
+jcluser@vMX-1> file more /opt/yang-pkg/junos-openconfig/yang/openconfig-interfaces.yang
+```
+To understand which YANG deviations are used on a Junos device, run this command:  
+```
+jcluser@vMX-1> file more /opt/yang-pkg/junos-openconfig/yang/jnx-openconfig-dev.yang
+```
+
+### Junos configuration
+
+```
+jcluser@vMX-1> show configuration system services netconf | display set
+set system services netconf ssh
+```
+```
+jcluser@vMX-1> show configuration system services extension-service | display set
+set system services extension-service request-response grpc clear-text port 32768
+set system services extension-service request-response grpc skip-authentication
+set system services extension-service notification allow-clients address 0.0.0.0/0
+```
+
+# Kafka broker
 
 The file [docker-compose.yml](docker-compose.yml) uses the Docker images [wurstmeister/zookeeper](https://hub.docker.com/r/wurstmeister/zookeeper) and [wurstmeister/kafka](https://hub.docker.com/r/wurstmeister/kafka) 
 
@@ -32,9 +171,12 @@ $ nc -vz 100.123.35.0 9092
 Connection to 100.123.35.0 9092 port [tcp/*] succeeded!
 ```
 
-# Junos requirements
-
 # Telegraf 
+
+Telegraf is an open source collector written in GO.  
+It is plugin-driven (it has input plugins, output plugins, ...)  
+We will use jti_openconfig_telemetry input plugin (grpc client to collect telemetry on junos devices) and kafka output plugin.   
+So, Telegraf will collect openconfig data from Junos devices and produce Kafta messages (with the data collected) .
 
 Update the file [telegraf.conf](telegraf.conf) with your host IP.  
 
@@ -64,7 +206,7 @@ $ apt-get install kafkacat
 
 Alternatively, use the Docker image [edenhill/kafkacat](https://hub.docker.com/r/edenhill/kafkacat/)  
 
-## List metadata from topics from a broker
+## List metadata
 
 Using kafkacat
 ```
@@ -155,4 +297,5 @@ $ docker ps -a | grep wurstmeister
 
 # Credits 
 
-Thank you to Jag Channa for writing this blog: https://openeye.blog/2018/03/05/streaming-junos-telemetry-to-apache-kafka-via-telegraf/  It provided the basis for this repository.
+Thank you to Jag Channa for writing this blog: https://openeye.blog/2018/03/05/streaming-junos-telemetry-to-apache-kafka-via-telegraf/   
+It provided the basis for this repository.
