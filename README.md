@@ -297,7 +297,7 @@ $ kafkacat -C -b 100.123.35.0:9092 -t juniper -o -2 -e
 
 # Python
 
-We will consume Kafka messages using 
+We will consume Kafka messages using Python  
 
 ## Requirements 
 
